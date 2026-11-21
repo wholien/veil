@@ -18,6 +18,7 @@ func TestFileRuleMatching(t *testing.T) {
 		"src/private/x":          "**",
 		"README.md":              "**",
 		".gitattributes":         "",
+		"sub/.gitattributes":     "",
 		".veil/policy.yaml":      "",
 	}
 	for file, want := range cases {

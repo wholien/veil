@@ -94,7 +94,7 @@ func firstMatch(rules []Rule, name string, basenameIfNoSlash bool) *Rule {
 
 func (p *Policy) FileRule(file string) *Rule {
 	file = filepath.ToSlash(file)
-	if file == ".gitattributes" || strings.HasPrefix(file, ".veil/") {
+	if path.Base(file) == ".gitattributes" || strings.HasPrefix(file, ".veil/") {
 		return nil
 	}
 	return firstMatch(p.Files, file, true)

@@ -152,7 +152,7 @@ secrets:
 	if st := e.must(e.aliceKey, alice2, "git status --porcelain"); st != "" {
 		t.Fatalf("alice2 dirty after unlock: %q", st)
 	}
-	e.must(e.aliceKey, alice2, "veil branch pull private/exp --remote origin")
+	e.must(e.aliceKey, alice2, "veil branch pull private/exp --remote "+origin)
 	if got := e.must(e.aliceKey, alice2, "git show private/exp:idea.txt"); got != "idea\n" {
 		t.Fatalf("pulled branch: %q", got)
 	}

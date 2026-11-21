@@ -1,10 +1,13 @@
 package veil
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -88,7 +91,16 @@ func BranchPush(branch, remote, base string, w io.Writer) error {
 	return nil
 }
 
-func trackingRef(remote, branch string) string { return "refs/veil/remotes/" + remote + "/" + branch }
+var remoteName = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]*$`)
+
+func trackingRef(remote, branch string) string {
+	// Remotes given as URLs or paths aren't valid ref components; key them by hash instead.
+	if !remoteName.MatchString(remote) {
+		sum := sha256.Sum256([]byte(remote))
+		remote = "url-" + hex.EncodeToString(sum[:8])
+	}
+	return "refs/veil/remotes/" + remote + "/" + branch
+}
 
 // BranchPull fetches and decrypts a private branch into refs/heads/<name>.
 func BranchPull(branch, remote string, w io.Writer) error {

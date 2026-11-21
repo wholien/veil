@@ -70,7 +70,8 @@ func Sync(w io.Writer) error {
 	for _, r := range pol.Files {
 		block = append(block, r.Match+" filter=veil diff=veil")
 	}
-	block = append(block, attrEnd)
+	// veil's own files must stay readable to every clone, even under a catch-all rule.
+	block = append(block, ".gitattributes -filter -diff", ".veil/** -filter -diff", attrEnd)
 	out := strings.Join(append(kept, block...), "\n") + "\n"
 	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
 		return err

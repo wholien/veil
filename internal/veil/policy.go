@@ -61,6 +61,9 @@ func (p *Policy) validate() error {
 	}
 	for _, rules := range [][]Rule{p.Files, p.Branches, p.Secrets} {
 		for _, r := range rules {
+			if r.Match == "" || strings.ContainsAny(r.Match, " \t\"") {
+				return fmt.Errorf("pattern %q must be non-empty and contain no whitespace or quotes", r.Match)
+			}
 			if !doublestar.ValidatePattern(strings.TrimPrefix(r.Match, "/")) {
 				return fmt.Errorf("invalid pattern %q", r.Match)
 			}
@@ -90,8 +93,13 @@ func firstMatch(rules []Rule, name string, basenameIfNoSlash bool) *Rule {
 }
 
 func (p *Policy) FileRule(file string) *Rule {
-	return firstMatch(p.Files, filepath.ToSlash(file), true)
+	file = filepath.ToSlash(file)
+	if file == ".gitattributes" || strings.HasPrefix(file, ".veil/") {
+		return nil
+	}
+	return firstMatch(p.Files, file, true)
 }
+
 func (p *Policy) BranchRule(name string) *Rule { return firstMatch(p.Branches, name, false) }
 func (p *Policy) SecretRule(name string) *Rule { return firstMatch(p.Secrets, name, false) }
 

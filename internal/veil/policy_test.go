@@ -7,15 +7,18 @@ func TestFileRuleMatching(t *testing.T) {
 		{Match: "*.pem", Groups: []string{"a"}},
 		{Match: "/private/**", Groups: []string{"b"}},
 		{Match: "docs/internal/*.md", Groups: []string{"c"}},
+		{Match: "**", Groups: []string{"d"}},
 	}}
 	cases := map[string]string{
 		"key.pem":                "*.pem",
 		"deploy/sub/key.pem":     "*.pem",
 		"private/x/y.txt":        "/private/**",
 		"docs/internal/a.md":     "docs/internal/*.md",
-		"docs/internal/sub/a.md": "",
-		"src/private/x":          "",
-		"README.md":              "",
+		"docs/internal/sub/a.md": "**",
+		"src/private/x":          "**",
+		"README.md":              "**",
+		".gitattributes":         "",
+		".veil/policy.yaml":      "",
 	}
 	for file, want := range cases {
 		got := ""
@@ -35,5 +38,12 @@ func TestPolicyValidation(t *testing.T) {
 	}
 	if err := p.validate(); err == nil {
 		t.Fatal("expected error for unknown member")
+	}
+}
+
+func TestPatternWithWhitespaceRejected(t *testing.T) {
+	p := &Policy{Groups: map[string][]string{"g": nil}, Files: []Rule{{Match: "private docs/**", Groups: []string{"g"}}}}
+	if err := p.validate(); err == nil {
+		t.Fatal("expected error for pattern with a space")
 	}
 }

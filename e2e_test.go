@@ -199,6 +199,9 @@ secrets:
 	e.must(e.aliceKey, alice, "git checkout -q main && git pull -q --rebase origin main")
 	b, _ := os.ReadFile(filepath.Join(alice, ".veil", "policy.yaml"))
 	os.WriteFile(filepath.Join(alice, ".veil", "policy.yaml"), []byte(strings.Replace(string(b), "core: [alice]", "core: [alice, bob]", 1)), 0o644)
+	// Rekey must also cover files still sitting as ciphertext in the working tree.
+	os.Remove(filepath.Join(alice, "private", "plan.md"))
+	e.must(e.aliceKey, alice, "git -c filter.veil.smudge=cat checkout -- private/plan.md && head -c 9 private/plan.md | grep -q '# veil:v1'")
 	e.must(e.aliceKey, alice, "veil rekey && git add -A && git commit -qm 'grant bob' && git push -q origin main")
 	e.must(e.bobKey, bob, "git pull -q origin main && veil unlock")
 	if b, _ := os.ReadFile(filepath.Join(bob, "private", "plan.md")); string(b) != "acquire competitor\nfriday\n" {

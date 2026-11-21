@@ -166,6 +166,10 @@ func Rekey(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// Clean passes ciphertext through untouched, so decrypt readable files first.
+	if err := Unlock(w); err != nil {
+		return err
+	}
 	if len(files) > 0 {
 		args := append([]string{"-C", root, "add", "--renormalize", "--"}, files...)
 		if _, err := git(args...); err != nil {

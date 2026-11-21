@@ -98,11 +98,20 @@ func Unlock(w io.Writer) error {
 		if err != nil || !IsSealed(data) {
 			continue
 		}
-		if _, err := Open(data, ids); errors.Is(err, ErrNoAccess) {
+		pt, err := Open(data, ids)
+		if errors.Is(err, ErrNoAccess) {
 			fmt.Fprintf(w, "locked    %s (no access)\n", f)
 			continue
 		} else if err != nil {
 			return fmt.Errorf("%s: %w", f, err)
+		}
+		if staged, err := gitRaw(nil, nil, "-C", root, "cat-file", "blob", ":"+f); err != nil || !bytes.Equal(staged, data) {
+			// Differs from the index: decrypt in place so the change isn't lost.
+			if err := os.WriteFile(filepath.Join(root, f), pt, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(w, "unlocked  %s\n", f)
+			continue
 		}
 		readable = append(readable, f)
 	}

@@ -67,9 +67,6 @@ func BranchPush(branch, remote, base string, w io.Writer) error {
 		return err
 	}
 	ref := branchRefPrefix + branch
-	// The last value we pulled or pushed; the remote must still have it, so a stale clone
-	// can't silently overwrite a teammate's newer push.
-	prev, _ := git("rev-parse", "--verify", "--quiet", ref)
 	if _, err := git("update-ref", ref, strings.TrimSpace(string(commit))); err != nil {
 		return err
 	}
@@ -77,23 +74,31 @@ func BranchPush(branch, remote, base string, w io.Writer) error {
 	if remote == "" {
 		return nil
 	}
-	if _, err := git("push", "--no-verify", "--force-with-lease="+ref+":"+prev, remote, ref+":"+ref); err != nil {
-		if prev != "" {
-			git("update-ref", ref, prev)
-		} else {
-			git("update-ref", "-d", ref)
-		}
+	// Lease against the last value seen on this remote, so a stale clone can't silently
+	// overwrite a teammate's newer push. Empty means the ref must not exist yet.
+	track := trackingRef(remote, branch)
+	seen, _ := git("rev-parse", "--verify", "--quiet", track)
+	if _, err := git("push", "--no-verify", "--force-with-lease="+ref+":"+seen, remote, ref+":"+ref); err != nil {
 		return fmt.Errorf("%w\nthe remote has a newer version; run `veil branch pull %s --remote %s` first", err, branch, remote)
+	}
+	if _, err := git("update-ref", track, ref); err != nil {
+		return err
 	}
 	fmt.Fprintf(w, "pushed %s to %s\n", ref, remote)
 	return nil
 }
 
+func trackingRef(remote, branch string) string { return "refs/veil/remotes/" + remote + "/" + branch }
+
 // BranchPull fetches and decrypts a private branch into refs/heads/<name>.
 func BranchPull(branch, remote string, w io.Writer) error {
 	ref := branchRefPrefix + branch
 	if remote != "" {
-		if _, err := git("fetch", remote, "+"+ref+":"+ref); err != nil {
+		track := trackingRef(remote, branch)
+		if _, err := git("fetch", remote, "+"+ref+":"+track); err != nil {
+			return err
+		}
+		if _, err := git("update-ref", ref, track); err != nil {
 			return err
 		}
 	}

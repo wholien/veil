@@ -137,7 +137,7 @@ secrets:
 	if out, err := e.run(e.aliceKey, alice, "git push origin private/exp:review"); err == nil || !strings.Contains(out, "private branch") {
 		t.Fatalf("renamed push of private branch was not blocked: %v\n%s", err, out)
 	}
-	e.must(e.aliceKey, alice, "veil branch push private/exp --remote origin")
+	e.must(e.aliceKey, alice, "veil branch push private/exp && veil branch push private/exp --remote origin")
 	if heads := e.must(e.aliceKey, alice, "git ls-remote origin refs/heads/*"); strings.Contains(heads, "private") {
 		t.Fatalf("private branch leaked as a head: %s", heads)
 	}

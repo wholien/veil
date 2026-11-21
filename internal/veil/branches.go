@@ -67,6 +67,9 @@ func BranchPush(branch, remote, base string, w io.Writer) error {
 		return err
 	}
 	ref := branchRefPrefix + branch
+	// The last value we pulled or pushed; the remote must still have it, so a stale clone
+	// can't silently overwrite a teammate's newer push.
+	prev, _ := git("rev-parse", "--verify", "--quiet", ref)
 	if _, err := git("update-ref", ref, strings.TrimSpace(string(commit))); err != nil {
 		return err
 	}
@@ -74,8 +77,13 @@ func BranchPush(branch, remote, base string, w io.Writer) error {
 	if remote == "" {
 		return nil
 	}
-	if _, err := git("push", "--no-verify", remote, "+"+ref+":"+ref); err != nil {
-		return err
+	if _, err := git("push", "--no-verify", "--force-with-lease="+ref+":"+prev, remote, ref+":"+ref); err != nil {
+		if prev != "" {
+			git("update-ref", ref, prev)
+		} else {
+			git("update-ref", "-d", ref)
+		}
+		return fmt.Errorf("%w\nthe remote has a newer version; run `veil branch pull %s --remote %s` first", err, branch, remote)
 	}
 	fmt.Fprintf(w, "pushed %s to %s\n", ref, remote)
 	return nil
@@ -106,7 +114,15 @@ func BranchPull(branch, remote string, w io.Writer) error {
 	if err := os.WriteFile(bundle, data, 0o600); err != nil {
 		return err
 	}
-	if _, err := git("fetch", bundle, "+refs/heads/"+branch+":refs/heads/"+branch); err != nil {
+	// Fast-forward only, so unpushed local commits are never discarded.
+	if current, _ := git("symbolic-ref", "--quiet", "--short", "HEAD"); current == branch {
+		if _, err := git("fetch", bundle, "refs/heads/"+branch); err != nil {
+			return err
+		}
+		if _, err := git("merge", "--ff-only", "FETCH_HEAD"); err != nil {
+			return err
+		}
+	} else if _, err := git("fetch", bundle, "refs/heads/"+branch+":refs/heads/"+branch); err != nil {
 		return err
 	}
 	fmt.Fprintf(w, "updated branch %s\n", branch)

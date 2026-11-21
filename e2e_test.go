@@ -134,6 +134,9 @@ secrets:
 	if out, err := e.run(e.aliceKey, alice, "git push origin private/exp"); err == nil || !strings.Contains(out, "private branch") {
 		t.Fatalf("plain push of private branch was not blocked: %v\n%s", err, out)
 	}
+	if out, err := e.run(e.aliceKey, alice, "git push origin private/exp:review"); err == nil || !strings.Contains(out, "private branch") {
+		t.Fatalf("renamed push of private branch was not blocked: %v\n%s", err, out)
+	}
 	e.must(e.aliceKey, alice, "veil branch push private/exp --remote origin")
 	if heads := e.must(e.aliceKey, alice, "git ls-remote origin refs/heads/*"); strings.Contains(heads, "private") {
 		t.Fatalf("private branch leaked as a head: %s", heads)
@@ -152,6 +155,19 @@ secrets:
 	e.must(e.aliceKey, alice2, "veil branch pull private/exp --remote origin")
 	if got := e.must(e.aliceKey, alice2, "git show private/exp:idea.txt"); got != "idea\n" {
 		t.Fatalf("pulled branch: %q", got)
+	}
+	// Updates fast-forward a checked-out branch, and a stale clone can't overwrite them.
+	e.must(e.aliceKey, alice, "echo v2 > idea.txt && git commit -qam v2 && veil branch push private/exp --remote origin")
+	e.must(e.aliceKey, alice2, "git checkout -q private/exp && veil branch pull private/exp --remote origin")
+	if b, _ := os.ReadFile(filepath.Join(alice2, "idea.txt")); string(b) != "v2\n" {
+		t.Fatalf("checked-out pull: %q", b)
+	}
+	e.must(e.aliceKey, alice2, "echo v3 > idea.txt && git commit -qam v3 && veil branch push private/exp --remote origin && git checkout -q main")
+	if out, err := e.run(e.aliceKey, alice, "echo stale > other.txt && git add other.txt && git commit -qm stale && veil branch push private/exp --remote origin"); err == nil {
+		t.Fatalf("stale branch push overwrote newer work:\n%s", out)
+	}
+	if out, err := e.run(e.aliceKey, alice, "git checkout -q main && veil branch pull private/exp --remote origin"); err == nil {
+		t.Fatalf("pull discarded local commits:\n%s", out)
 	}
 
 	// Bob sees ciphertext, can read only the shared secret, and cannot pull the branch.

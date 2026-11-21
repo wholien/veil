@@ -94,6 +94,10 @@ func Unlock(w io.Writer) error {
 	ids := ageIdentities()
 	var readable []string
 	for _, f := range files {
+		// Only regular files: following a committed symlink could write plaintext elsewhere.
+		if fi, err := os.Lstat(filepath.Join(root, f)); err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
 		data, err := os.ReadFile(filepath.Join(root, f))
 		if err != nil || !IsSealed(data) {
 			continue

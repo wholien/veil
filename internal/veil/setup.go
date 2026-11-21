@@ -141,17 +141,27 @@ func Whoami(w io.Writer) error {
 
 // HookPrePush rejects pushing private branches as normal refs. Input is git's pre-push stdin.
 func HookPrePush(in io.Reader) error {
-	_, pol, err := loadRepoPolicy()
+	root, err := RepoRoot()
 	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(root, PolicyPath)); errors.Is(err, os.ErrNotExist) {
 		return nil
+	}
+	pol, err := LoadPolicy(root)
+	if err != nil {
+		return fmt.Errorf("veil: blocking push until the policy is fixed: %w", err)
 	}
 	for _, line := range readLines(in) {
 		f := strings.Fields(line)
 		if len(f) != 4 || strings.Trim(f[1], "0") == "" {
 			continue
 		}
-		if name, ok := strings.CutPrefix(f[2], "refs/heads/"); ok && pol.BranchRule(name) != nil {
-			return fmt.Errorf("veil: %q is a private branch; push it with `veil branch push %s --remote <remote>`", name, name)
+		// Check both sides so `git push origin private/x:public` is caught too.
+		for _, ref := range []string{f[0], f[2]} {
+			if name, ok := strings.CutPrefix(ref, "refs/heads/"); ok && pol.BranchRule(name) != nil {
+				return fmt.Errorf("veil: %q is a private branch; push it with `veil branch push %s --remote <remote>`", name, name)
+			}
 		}
 	}
 	return nil
